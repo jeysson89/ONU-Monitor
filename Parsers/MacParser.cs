@@ -25,13 +25,22 @@ namespace BDCOM.OLT.Manager.Parsers
                         results.Add(normalized);
                 }
             }
+
             return results.OrderBy(x => x).ToList();
         }
 
-        private static string Normalize(string mac)
+        public static string Normalize(string mac)
         {
-            string cleaned = Regex.Replace(mac, @"[^0-9a-fA-F]", "").ToLower();
-            if (cleaned.Length != 12) return "";
+            if (string.IsNullOrEmpty(mac))
+                return "";
+
+            // Убираем все разделители и приводим к нижнему регистру
+            string cleaned = Regex.Replace(mac, @"[^0-9a-fA-F]", "").ToLowerInvariant();
+
+            if (cleaned.Length != 12)
+                return "";
+
+            // Возвращаем в формате xxxx.xxxx.xxxx
             return $"{cleaned.Substring(0, 4)}.{cleaned.Substring(4, 4)}.{cleaned.Substring(8, 4)}";
         }
     }
