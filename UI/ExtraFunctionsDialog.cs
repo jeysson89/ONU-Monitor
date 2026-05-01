@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Windows.Forms;
 using BDCOM.OLT.Manager.Core;
 using BDCOM.OLT.Manager.UI;
@@ -14,102 +15,121 @@ namespace BDCOM.OLT.Manager
         {
             _mainForm = mainForm;
             _telnetClient = mainForm.GetTelnetClient();
-
             InitializeComponent();
         }
 
         private void InitializeComponent()
         {
             this.Text = "Дополнительные функции";
-            this.Size = new System.Drawing.Size(520, 420);
+            this.Size = new Size(460, 680);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
-            this.MinimizeBox = false;
 
-            // Кнопка перезагрузки OLT
-            var btnRebootOlt = new Button
-            {
-                Text = "Перезагрузить OLT",
-                Location = new System.Drawing.Point(60, 50),
-                Size = new System.Drawing.Size(400, 55),
-                BackColor = System.Drawing.Color.Crimson,
-                ForeColor = System.Drawing.Color.White,
-                Font = new System.Drawing.Font("Segoe UI", 11f, System.Drawing.FontStyle.Bold)
-            };
-            btnRebootOlt.Click += BtnRebootOlt_Click;
+            int y = 30;
 
-            // Кнопка сохранения конфигурации
-            var btnSaveConfig = new Button
-            {
-                Text = "Сохранить конфигурацию (write all)",
-                Location = new System.Drawing.Point(60, 130),
-                Size = new System.Drawing.Size(400, 55),
-                BackColor = System.Drawing.Color.DarkGreen,
-                ForeColor = System.Drawing.Color.White,
-                Font = new System.Drawing.Font("Segoe UI", 10f)
-            };
-            btnSaveConfig.Click += BtnSaveConfig_Click;
+            AddButton("Save (write all)", Color.Teal, y, SaveConfig); y += 65;
+            AddButton("Reboot OLT", Color.Crimson, y, RebootOLT); y += 65;
 
-            // Кнопка закрытия
+            AddLabel("Управление LAN портом ONU", y); y += 35;
+            AddButton("Выкл LAN ONU", Color.Crimson, y, () => LanOnuCommand("off")); y += 65;
+            AddButton("Вкл LAN ONU", Color.MediumSeaGreen, y, () => LanOnuCommand("on")); y += 65;
+
+            AddLabel("Управление портом EPON", y); y += 35;
+            AddButton("Выкл Порт EPON", Color.Crimson, y, () => EponPortCommand("off")); y += 65;
+            AddButton("Вкл Порт EPON", Color.MediumSeaGreen, y, () => EponPortCommand("on")); y += 65;
+
             var btnClose = new Button
             {
                 Text = "Закрыть",
-                Location = new System.Drawing.Point(60, 320),
-                Size = new System.Drawing.Size(400, 45),
-                Font = new System.Drawing.Font("Segoe UI", 10f)
+                Location = new Point(160, 580),
+                Size = new Size(140, 45),
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold)
             };
             btnClose.Click += (s, e) => this.Close();
 
-            this.Controls.Add(btnRebootOlt);
-            this.Controls.Add(btnSaveConfig);
             this.Controls.Add(btnClose);
         }
 
-        private async void BtnRebootOlt_Click(object? sender, EventArgs e)
+        private void AddButton(string text, Color color, int y, Action action)
         {
-            if (_telnetClient == null)
+            var btn = new Button
             {
-                MessageBox.Show("Нет активного подключения к OLT", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            // Первое подтверждение
-            var result = MessageBox.Show(
-                "ВНИМАНИЕ!\n\nOLT будет перезагружен!\n\nЭто действие приведёт к отключению ВСЕХ абонентов!\n\nПродолжить?",
-                "Критическое действие — Перезагрузка OLT",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning);
-
-            if (result != DialogResult.Yes) return;
-
-            // Второе подтверждение (ввод слова "АДЕКВАТНЫЙ")
-            var secondConfirm = new SecondConfirmDialog("OLT", "перезагрузку OLT");
-            if (secondConfirm.ShowDialog(this) != DialogResult.OK) return;
-
-            // Выполняем команду
-            var (output, success) = await _telnetClient.ExecuteAsync("reload");
-
-            if (success)
-                MessageBox.Show("Команда на перезагрузку OLT отправлена.\nОборудование будет перезагружено.", "Успешно", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            else
-                MessageBox.Show("Не удалось отправить команду перезагрузки.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Text = text,
+                Location = new Point(60, y),
+                Size = new Size(340, 58),
+                BackColor = color,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+                FlatStyle = FlatStyle.Flat
+            };
+            btn.FlatAppearance.BorderSize = 0;
+            btn.Click += (s, e) => action();
+            this.Controls.Add(btn);
         }
 
-        private async void BtnSaveConfig_Click(object? sender, EventArgs e)
+        private void AddLabel(string text, int y)
         {
-            if (_telnetClient == null)
+            var lbl = new Label
             {
-                MessageBox.Show("Нет активного подключения", "Ошибка");
+                Text = text,
+                Location = new Point(60, y),
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.DimGray,
+                AutoSize = true
+            };
+            this.Controls.Add(lbl);
+        }
+
+        // ==================== Правильные команды ====================
+
+        private async void SaveConfig()
+        {
+            if (_telnetClient == null) return;
+            await _telnetClient.ExecuteAsync("write all");
+            MessageBox.Show("Конфигурация сохранена (write all)", "Успешно");
+        }
+
+        private async void RebootOLT()
+        {
+            if (_telnetClient == null) return;
+            if (MessageBox.Show("Перезагрузить OLT?\nВсе абоненты будут отключены!", "ВНИМАНИЕ", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+
+            var confirm = new SecondConfirmDialog("OLT", "перезагрузку OLT");
+            if (confirm.ShowDialog(this) != DialogResult.OK) return;
+
+            await _telnetClient.ExecuteAsync("reload");
+            MessageBox.Show("Команда reload отправлена.\nOLT перезагружается...", "Выполнено");
+        }
+
+        private async void LanOnuCommand(string state)
+        {
+            var p = _mainForm.GetCurrentParams();
+            if (p == null) return;
+
+            string cmd = state == "on"
+                ? $"interface epon {p.Slot}/{p.Port}:{p.OnuId}\nno epon onu port 1 ctc shutdown\nexit"
+                : $"interface epon {p.Slot}/{p.Port}:{p.OnuId}\nepon onu port 1 ctc shutdown\nexit";
+
+            await _telnetClient.ExecuteAsync(cmd);
+            MessageBox.Show($"LAN порт ONU {p.FullId} {state.ToUpper()}", "Выполнено");
+        }
+
+        private async void EponPortCommand(string state)
+        {
+            string port = _mainForm.GetCurrentPort();
+            if (string.IsNullOrEmpty(port))
+            {
+                MessageBox.Show("Укажите порт в поле 'Порт'", "Ошибка");
                 return;
             }
 
-            var (output, success) = await _telnetClient.ExecuteAsync("write all");
+            string cmd = state == "on"
+                ? $"interface epon 0/{port}\nno shutdown\nexit"
+                : $"interface epon 0/{port}\nshutdown\nexit";
 
-            if (success)
-                MessageBox.Show("Команда 'write all' выполнена успешно.\nКонфигурация сохранена.", "Успешно");
-            else
-                MessageBox.Show("Не удалось выполнить команду 'write all'.", "Ошибка");
+            await _telnetClient.ExecuteAsync(cmd);
+            MessageBox.Show($"Порт EPON 0/{port} {state.ToUpper()}", "Выполнено");
         }
     }
 }
